@@ -10,9 +10,7 @@ use std::iter::Iterator;
 
 use glob::glob;
 
-use svg::node::Value;
 use svg::parser::Event;
-use svg::node::element::tag::Text;
 
 use serde::{Serialize, Deserialize};
 
@@ -33,11 +31,12 @@ struct Counts {
     inserted: u64,
     moved: u64,
     rotated: u64,
+    total: u64,
 }
 
 fn count(path: &Path) -> Result<Counts, Box<dyn Error>> {
     let urs = path.file_stem().unwrap().to_str().unwrap().to_string();
-    let mut counts = Counts { urs, changed: 0, unchanged: 0, inserted: 0, moved: 0, rotated: 0 };
+    let mut counts = Counts { urs, changed: 0, unchanged: 0, inserted: 0, moved: 0, rotated: 0, total: 0 };
     let doc = svg::open(path)?;
 
     for event in doc {
@@ -59,6 +58,11 @@ fn count(path: &Path) -> Result<Counts, Box<dyn Error>> {
             _ => (),
         }
     }
+    counts.total = counts.changed + 
+        counts.unchanged + 
+        counts.inserted + 
+        counts.moved + 
+        counts.rotated;
     return Ok(counts);
 }
 
@@ -67,7 +71,10 @@ pub fn main() -> Result<(), Box<dyn Error>> {
 
     let mut wtr = csv::Writer::from_writer(io::stdout());
 
-    let counts = glob(&opt.input)?.filter_map(Result::ok).map(|p| count(&p));
+    let counts = glob(&opt.input)?
+        .filter_map(Result::ok)
+        .map(|p| count(&p));
+
     for count in counts {
         let c = count?;
         wtr.serialize(c)?;
