@@ -1,0 +1,12 @@
+[package]
+name = "coloring-file-validation"
+version = "0.1.0"
+authors = ["Blake Sweeney <bsweeney@ebi.ac.uk>"]
+edition = "2018"
+
+[dependencies]
+csv = "1.1"
+svg = "0.8.0"
+glob = "0.3.0"
+serde = { version = "1.0", features = ["derive"] }
+structopt = "0.2"
