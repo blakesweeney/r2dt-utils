@@ -5,13 +5,13 @@ use std::io::{self, BufReader};
 use std::iter::Iterator;
 use std::path::{Path, PathBuf};
 
+use globset::{Glob, GlobSetBuilder};
 use walkdir::WalkDir;
-use globset::Glob;
 
-use quick_xml::Reader;
 use quick_xml::events::Event;
+use quick_xml::Reader;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use structopt::StructOpt;
 
@@ -22,10 +22,10 @@ enum Command {
         #[structopt(parse(from_os_str))]
         tree: PathBuf,
     },
-    #[structopt(name = "json-file", about="Parse a JSON file of urs, layout of SVGS")]
+    #[structopt(name = "json-file", about = "Parse a JSON file of urs, layout of SVGS")]
     Json {
         #[structopt(parse(from_os_str))]
-        file: PathBuf
+        file: PathBuf,
     },
 }
 
@@ -33,7 +33,7 @@ enum Command {
 #[structopt(about = "Tool to parse a tree of SVG files and do color counts")]
 struct Opt {
     #[structopt(subcommand)]
-    cmd: Command
+    cmd: Command,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -73,48 +73,46 @@ fn count_reader<B: BufRead>(urs: String, reader: &mut Reader<B>) -> Result<Count
     let mut buf = Vec::new();
     loop {
         match reader.read_event(&mut buf) {
-            Ok(Event::Start(ref e)) => {
-                match e.name() {
-                    b"text" => {
-                        let text = reader.read_text(e.name(), &mut Vec::new())?;
-                        let class = e.attributes().with_checks(false).find(|attr| {
-                            match attr {
-                                Ok(a) => a.key == b"class",
-                                _ => false,
-                            }
-                        });
-                        match (is_valid_letter(text), class) {
-                            (true, Some(Ok(v))) => match v.value.as_ref() {
-                                b"green" => counts.changed += 1,
-                                b"black" => counts.unchanged += 1,
-                                b"red" => counts.inserted += 1,
-                                b"blue" => counts.moved += 1,
-                                b"brown" => counts.rotated += 1,
-                                _ => (),
-                            },
+            Ok(Event::Start(ref e)) => match e.name() {
+                b"text" => {
+                    let text = reader.read_text(e.name(), &mut Vec::new())?;
+                    let class = e.attributes().with_checks(false).find(|attr| match attr {
+                        Ok(a) => a.key == b"class",
+                        _ => false,
+                    });
+                    match (is_valid_letter(text), class) {
+                        (true, Some(Ok(v))) => match v.value.as_ref() {
+                            b"green" => counts.changed += 1,
+                            b"black" => counts.unchanged += 1,
+                            b"red" => counts.inserted += 1,
+                            b"blue" => counts.moved += 1,
+                            b"brown" => counts.rotated += 1,
                             _ => (),
-                        }
-                    },
-                    _ => (),
+                        },
+                        _ => (),
+                    }
                 }
+                _ => (),
             },
             Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             Ok(Event::Eof) => break,
             _ => (),
         }
     }
-    counts.total = counts.changed +
-        counts.unchanged +
-        counts.inserted +
-        counts.moved +
-        counts.rotated;
+    counts.total =
+        counts.changed + counts.unchanged + counts.inserted + counts.moved + counts.rotated;
     return Ok(counts);
 }
 
 fn count_tree(path: PathBuf) -> Result<(), Box<dyn Error>> {
     let walker = WalkDir::new(path);
-    let glob = Glob::new("*.svg")?.compile_matcher();
-    let counts = walker.into_iter()
+    let mut builder = GlobSetBuilder::new();
+    builder.add(Glob::new("*.svg")?);
+    builder.add(Glob::new("*.svg.gz")?);
+    let glob = builder.build()?;
+
+    let counts = walker
+        .into_iter()
         .filter_map(Result::ok)
         .filter(move |e| glob.is_match(e.file_name()))
         .map(|path| {
@@ -134,14 +132,12 @@ fn count_tree(path: PathBuf) -> Result<(), Box<dyn Error>> {
 fn count_json(filename: PathBuf) -> Result<(), Box<dyn Error>> {
     let file = File::open(filename)?;
     let file = BufReader::new(file);
-    let counts = file.lines()
-        .into_iter()
-        .map(|line|  {
-            let line = line?.replace("\\\\", "\\");
-            let entry: JsonEntry = serde_json::from_str(&line)?;
-            let mut reader = Reader::from_str(entry.svg.as_ref());
-            return count_reader(entry.urs, &mut reader);
-        });
+    let counts = file.lines().into_iter().map(|line| {
+        let line = line?.replace("\\\\", "\\");
+        let entry: JsonEntry = serde_json::from_str(&line)?;
+        let mut reader = Reader::from_str(entry.svg.as_ref());
+        return count_reader(entry.urs, &mut reader);
+    });
     let mut wtr = csv::Writer::from_writer(io::stdout());
     for count in counts {
         let c = count?;
