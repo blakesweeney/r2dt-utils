@@ -5,11 +5,17 @@ authors = ["Blake Sweeney <bsweeney@ebi.ac.uk>"]
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 csv = "1.1"
-quick-xml = "0.18.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-structopt = "0.2"
-walkdir = "2"
 globset = "0.3"
 indexmap = "1.5.0"
+log = "0.4"
+quick-xml = "0.18.1"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
+serde = { version = "1.0", features = ["derive"] }
+serde-xml-rs = "0.4.0"
+serde_json = "1.0"
+simplelog = "^0.7.6"
+structopt = "0.3"
+walkdir = "2"
+

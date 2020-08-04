@@ -1,9 +1,11 @@
-use std::error::Error;
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+use anyhow::Result;
+
 mod coloring;
 // mod fixups;
+mod lineage;
 
 #[derive(Debug, StructOpt)]
 enum ColoringCommand {
@@ -21,7 +23,10 @@ enum ColoringCommand {
 
 #[derive(Debug, StructOpt)]
 enum FixupCommand {
-    #[structopt(name = "report", about = "Process a svg tree to find naming/compression/missing issues")]
+    #[structopt(
+        name = "report",
+        about = "Process a svg tree to find naming/compression/missing issues"
+    )]
     Report {
         #[structopt(parse(from_os_str))]
         tree: PathBuf,
@@ -33,8 +38,11 @@ enum FixupCommand {
 
 #[derive(Debug, StructOpt)]
 enum Command {
-    #[structopt(name = "coloring", about = "Count colors in a json-file or in a file tree.")]
-    Coloring { 
+    #[structopt(
+        name = "coloring",
+        about = "Count colors in a json-file or in a file tree."
+    )]
+    Coloring {
         #[structopt(subcommand)]
         cmd: ColoringCommand,
     },
@@ -44,25 +52,61 @@ enum Command {
         #[structopt(subcommand)]
         cmd: FixupCommand,
     },
+
+    #[structopt(
+        name = "lineage",
+        about = "Commad to fetch the taxid tree for some taxids"
+    )]
+    Lineage {
+        #[structopt(short = "c", long = "chunk-size", default_value = "10")]
+        chunk_size: usize,
+
+        #[structopt(name = "FILE", parse(from_os_str))]
+        filename: PathBuf,
+    },
 }
 
 #[derive(Debug, StructOpt)]
 #[structopt(about = "Tool to parse a tree of SVG files and do color counts")]
 struct Opt {
+    #[structopt(short = "v", long = "verbose", parse(from_occurrences))]
+    verbose: u32,
+
     #[structopt(subcommand)]
     cmd: Command,
 }
 
-pub fn main() -> Result<(), Box<dyn Error>> {
+pub fn main() -> Result<()> {
     let opt = Opt::from_args();
+
+    let level = match opt.verbose {
+        0 => simplelog::LevelFilter::Warn,
+        1 => simplelog::LevelFilter::Info,
+        2 => simplelog::LevelFilter::Debug,
+        _ => simplelog::LevelFilter::Trace,
+    };
+    simplelog::TermLogger::init(
+        level,
+        simplelog::Config::default(),
+        simplelog::TerminalMode::Stderr,
+    )
+    .unwrap_or_else(|_| eprintln!("Failed to create logger, ignore"));
+
     return match opt.cmd {
         Command::Coloring { cmd } => match cmd {
             ColoringCommand::Tree { tree } => coloring::count_tree(tree),
             ColoringCommand::Json { file } => coloring::count_json(file),
         },
         Command::Fixups { cmd } => match cmd {
-            FixupCommand::Report { tree: _tree, required: _required } => Ok(()),
+            FixupCommand::Report {
+                tree: _tree,
+                required: _required,
+            } => Ok(()),
             // FixupCommand::Report { tree, required } => fixups::report(tree, required),
         },
+        Command::Lineage {
+            chunk_size,
+            filename,
+        } => lineage::write_lineage(chunk_size, filename),
     };
 }

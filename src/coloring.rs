@@ -1,4 +1,3 @@
-use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, BufReader};
@@ -12,6 +11,8 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 
 use serde::{Deserialize, Serialize};
+
+use anyhow::Result;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Counts {
@@ -37,7 +38,7 @@ fn is_valid_letter(text: String) -> bool {
     }
 }
 
-fn count_reader<B: BufRead>(urs: String, reader: &mut Reader<B>) -> Result<Counts, Box<dyn Error>> {
+fn count_reader<B: BufRead>(urs: String, reader: &mut Reader<B>) -> Result<Counts> {
     let mut counts = Counts {
         urs,
         changed: 0,
@@ -81,7 +82,7 @@ fn count_reader<B: BufRead>(urs: String, reader: &mut Reader<B>) -> Result<Count
     return Ok(counts);
 }
 
-pub fn count_tree(path: PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn count_tree(path: PathBuf) -> Result<()> {
     let walker = WalkDir::new(path);
     let mut builder = GlobSetBuilder::new();
     builder.add(Glob::new("*.svg")?);
@@ -106,7 +107,7 @@ pub fn count_tree(path: PathBuf) -> Result<(), Box<dyn Error>> {
     return Ok(());
 }
 
-pub fn count_json(filename: PathBuf) -> Result<(), Box<dyn Error>> {
+pub fn count_json(filename: PathBuf) -> Result<()> {
     let file = File::open(filename)?;
     let file = BufReader::new(file);
     let counts = file.lines().into_iter().map(|line| {
@@ -122,4 +123,3 @@ pub fn count_json(filename: PathBuf) -> Result<(), Box<dyn Error>> {
     }
     return Ok(());
 }
-
