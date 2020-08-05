@@ -109,11 +109,7 @@ pub fn main() -> Result<()> {
             ColoringCommand::Json { file } => coloring::count_json(file),
         },
         Command::Fixups { cmd } => match cmd {
-            FixupCommand::Report {
-                tree: _tree,
-                required: _required,
-            } => Ok(()),
-            // FixupCommand::Report { tree, required } => fixups::report(tree, required),
+            FixupCommand::Report { tree, required } => fixups::write_report(&tree, required),
         },
         Command::Lineage {
             chunk_size,
