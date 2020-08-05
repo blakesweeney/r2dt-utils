@@ -3,9 +3,11 @@ use structopt::StructOpt;
 
 use anyhow::Result;
 
+mod ena;
 mod coloring;
 // mod fixups;
 mod lineage;
+mod lca;
 
 #[derive(Debug, StructOpt)]
 enum ColoringCommand {
@@ -64,6 +66,18 @@ enum Command {
         #[structopt(name = "FILE", parse(from_os_str))]
         filename: PathBuf,
     },
+
+    #[structopt(
+        name = "lca",
+        about = "Find the LCA between template and sequences"
+    )]
+    Lca {
+        #[structopt(name = "TAXIDS", parse(from_os_str))]
+        taxid_filename: PathBuf,
+
+        #[structopt(name = "ASSIGN", parse(from_os_str))]
+        assignments_filename: PathBuf,
+    },
 }
 
 #[derive(Debug, StructOpt)]
@@ -108,5 +122,9 @@ pub fn main() -> Result<()> {
             chunk_size,
             filename,
         } => lineage::write_lineage(chunk_size, filename),
+        Command::Lca {
+            taxid_filename,
+            assignments_filename,
+        } => lca::write_lca(taxid_filename, assignments_filename),
     };
 }

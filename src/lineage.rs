@@ -3,10 +3,10 @@ extern crate serde_json;
 extern crate serde_xml_rs;
 
 use std::collections::HashSet;
+use std::iter::FromIterator;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
-use std::iter::FromIterator;
 use std::path::PathBuf;
 use std::{thread, time};
 
@@ -16,19 +16,26 @@ use serde::{Deserialize, Serialize};
 
 use anyhow::Result;
 
-use serde_xml_rs::from_reader;
+use crate::ena::{species, EnaTaxonInfo};
 
-#[derive(Debug, Deserialize, Serialize)]
-struct LineageTaxon {
-    #[serde(rename = "scientificName")]
-    name: String,
-
-    #[serde(rename = "taxId")]
-    taxid: i64,
-    rank: Option<String>,
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub struct TaxonInfo {
+    pub name: String,
+    pub taxid: usize,
+    pub rank: Option<String>,
 }
 
-impl LineageTaxon {
+pub type Lineage = Vec<TaxonInfo>;
+
+impl TaxonInfo {
+    fn from_ena_taxon(taxon: &EnaTaxonInfo) -> Self {
+        return Self {
+            name: taxon.name.to_string(),
+            taxid: taxon.taxid,
+            rank: taxon.rank.as_ref().map(String::to_string),
+        };
+    }
+
     fn is_standard_level(&self) -> bool {
         match &self.rank {
             None => false,
@@ -47,33 +54,10 @@ impl LineageTaxon {
     }
 }
 
-#[derive(Debug, Serialize)]
-struct Mapping {
-    taxid: i64,
-    lineage: Option<Vec<LineageTaxon>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Lineage {
-    #[serde(rename = "taxon")]
-    taxons: Vec<LineageTaxon>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Taxon {
-    #[serde(rename = "scientificName")]
-    name: String,
-
-    #[serde(rename = "taxId")]
-    taxid: i64,
-    rank: Option<String>,
-    lineage: Lineage,
-}
-
-#[derive(Debug, Deserialize)]
-struct TaxonSet {
-    #[serde(rename = "taxon")]
-    taxons: Vec<Taxon>,
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+pub struct Mapping {
+    pub taxid: usize,
+    pub lineage: Option<Lineage>,
 }
 
 #[derive(Debug)]
@@ -83,45 +67,40 @@ struct Report {
     unmapped: usize,
 }
 
-fn lineage_mapping(taxon: Taxon) -> Mapping {
+fn lineage_mapping(taxon: &EnaTaxonInfo) -> Mapping {
     let mut lineage = Vec::new();
-    for subtaxon in taxon.lineage.taxons {
-        if subtaxon.is_standard_level() {
-            lineage.push(subtaxon);
+    lineage.push(TaxonInfo::from_ena_taxon(&taxon));
+    for parent in taxon.parent_taxons() {
+        let tinfo = TaxonInfo {
+            name: parent.name.to_string(),
+            taxid: parent.taxid,
+            rank: parent.rank.as_ref().map(|s| s.to_string()),
+        };
+        if tinfo.is_standard_level() {
+            lineage.push(tinfo);
         }
     }
-    let lineage = match lineage.is_empty() {
-        true => None,
-        false => Some(lineage),
-    };
     return Mapping {
         taxid: taxon.taxid,
-        lineage: lineage,
+        lineage: Some(lineage),
     };
 }
 
-fn species(taxids: &[i64]) -> Result<Vec<Mapping>> {
-    let string_taxids: Vec<String> = taxids.iter().map(|t| t.to_string()).collect();
-    let tids = string_taxids.join(",");
-    info!("Fetching mapping for {}", tids);
-    let mut url = String::from("https://www.ebi.ac.uk/ena/browser/api/xml/");
-    url.push_str(&tids);
-    let response = reqwest::blocking::get(&url)?;
+fn mappings(taxids: &[usize]) -> Result<Vec<Mapping>> {
+    let species = species(taxids)?;
+    let mut missing: HashSet<usize> = HashSet::from_iter(taxids.iter().cloned());
     let mut mappings = Vec::new();
-    let mut missing: HashSet<i64> = HashSet::from_iter(taxids.iter().cloned());
-    let body = response.text()?;
-    if !body.is_empty() {
-        let taxon_set: TaxonSet = from_reader(body.as_bytes())?;
-        for taxon in taxon_set.taxons {
-            missing.remove(&taxon.taxid);
-            let mapping = lineage_mapping(taxon);
-            mappings.push(mapping);
-        }
+    for entry in species {
+        let info = lineage_mapping(&entry);
+        mappings.push(info);
+        missing.remove(&entry.taxid);
     }
+
     let extra = missing.iter().map(|taxid| Mapping {
         taxid: *taxid,
         lineage: None,
     });
+
     mappings.extend(extra);
     return Ok(mappings);
 }
@@ -133,16 +112,17 @@ pub fn write_lineage(chunk_size: usize, filename: PathBuf) -> Result<()> {
     let taxids = reader
         .lines()
         .into_iter()
-        .map(|l| l.unwrap().trim().parse::<i64>().unwrap());
+        .map(|l| l.unwrap().trim().parse::<usize>().unwrap());
 
     let mut report = Report {
         total: 0,
         mapped: 0,
         unmapped: 0,
     };
-    for chunk in taxids.collect::<Vec<i64>>().chunks(chunk_size) {
+
+    for chunk in taxids.collect::<Vec<usize>>().chunks(chunk_size) {
         report.total += chunk.len();
-        let mappings = species(chunk)?;
+        let mappings = mappings(chunk)?;
         for mapping in mappings {
             match mapping.lineage {
                 None => {
