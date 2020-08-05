@@ -1,9 +1,9 @@
-use std::io::prelude::*;
-use std::path::PathBuf;
-use std::fs::File;
-use std::io::BufReader;
-use std::io;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::path::PathBuf;
 
 use anyhow::{anyhow, Result};
 
@@ -16,7 +16,7 @@ struct DiagramAssignment {
     urs: String,
     model_name: String,
     sequence_taxid: usize,
-    model_taxid: usize
+    model_taxid: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -42,7 +42,7 @@ fn load_taxid_trees(filename: PathBuf) -> Result<TreeInfo> {
             Some(l) => {
                 info.insert(mapping.taxid, l);
                 ();
-            },
+            }
             None => (),
         };
     }
@@ -52,7 +52,10 @@ fn load_taxid_trees(filename: PathBuf) -> Result<TreeInfo> {
 fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
     let sequence_lineage = match trees.get(&assignment.sequence_taxid) {
         Some(v) => Ok(v),
-        None => Err(anyhow!("Missing lineage for {}", &assignment.sequence_taxid)),
+        None => Err(anyhow!(
+            "Missing lineage for {}",
+            &assignment.sequence_taxid
+        )),
     }?;
     let model_lineage = match trees.get(&assignment.model_taxid) {
         Some(v) => Ok(v),
@@ -72,11 +75,10 @@ fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
             urs: assignment.urs,
             model_name: assignment.model_name,
             taxon: last,
-        })
+        });
     }
 
-    let pairs = sequence_lineage.iter()
-        .zip(model_lineage.iter());
+    let pairs = sequence_lineage.iter().zip(model_lineage.iter());
 
     for (seq, temp) in pairs {
         if seq != temp {
@@ -92,7 +94,7 @@ fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
                 urs: assignment.urs,
                 model_name: assignment.model_name,
                 taxon: prev,
-            })
+            });
         }
     }
 

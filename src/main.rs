@@ -3,11 +3,11 @@ use structopt::StructOpt;
 
 use anyhow::Result;
 
-mod ena;
 mod coloring;
-// mod fixups;
-mod lineage;
+mod ena;
+mod fixups;
 mod lca;
+mod lineage;
 
 #[derive(Debug, StructOpt)]
 enum ColoringCommand {
@@ -67,10 +67,7 @@ enum Command {
         filename: PathBuf,
     },
 
-    #[structopt(
-        name = "lca",
-        about = "Find the LCA between template and sequences"
-    )]
+    #[structopt(name = "lca", about = "Find the LCA between template and sequences")]
     Lca {
         #[structopt(name = "TAXIDS", parse(from_os_str))]
         taxid_filename: PathBuf,
