@@ -5,7 +5,7 @@ use regex::Regex;
 pub fn uncompressed_path(base: &PathBuf, urs: &String) -> PathBuf {
     let mut path = PathBuf::from(base);
     path.push("URS");
-    for x in (4..11).step_by(2) {
+    for x in (3..11).step_by(2) {
         path.push(urs[x..(x + 2)].to_string());
     }
     path.push(urs);
@@ -15,7 +15,7 @@ pub fn uncompressed_path(base: &PathBuf, urs: &String) -> PathBuf {
 
 pub fn path_for(base: &PathBuf, urs: &String) -> PathBuf {
     let mut path = PathBuf::from(uncompressed_path(base, urs));
-    path.set_extension("gz");
+    path.set_extension("svg.gz");
     return path;
 }
 
@@ -28,19 +28,76 @@ pub fn incorrect_paths(base: &PathBuf, urs: &String) -> Vec<PathBuf> {
 }
 
 pub fn looks_like_urs(urs: &str) -> bool {
-    let pattern = Regex::new(r"URS[0-9A-F]{10}$");
-    return match pattern {
-        Ok(re) => re.is_match(urs),
-        Err(_) => panic!("Someone should fix his regexs"),
-    };
+    lazy_static! {
+        static ref PATTERN: Regex = Regex::new(r"URS[0-9A-F]{10}$").unwrap();
+    }
+    return PATTERN.is_match(urs);
 }
 
 pub fn filename_urs(urs: &Path) -> Option<String> {
-    return urs.file_stem().and_then(|fs| fs.to_str()).and_then(|s| {
-        let prefix = &s[0..13];
-        return match looks_like_urs(prefix) {
-            true => Some(prefix.to_string()),
-            false => None,
-        };
-    });
+    return urs
+        .file_name()
+        .and_then(|f| f.to_str())
+        .map(|s| s.replace(".gz", ""))
+        .map(|s| s.replace("..svg", ""))
+        .map(|s| s.replace(".svg", ""))
+        .and_then(|stem| {
+            return match looks_like_urs(&stem.as_ref()) {
+                true => Some(stem),
+                false => None,
+            };
+        });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn matches_urs() {
+        assert_eq!(looks_like_urs("URS00000001AAB82D"), false);
+        assert_eq!(looks_like_urs("URS00000001B1"), true);
+        assert_eq!(looks_like_urs("URS0000000362"), true);
+    }
+
+    #[test]
+    fn extracts_urs() {
+        assert_eq!(
+            filename_urs(Path::new("URS0000000372..svg.gz")),
+            Some("URS0000000372".to_string())
+        );
+        assert_eq!(
+            filename_urs(Path::new("URS0000000372.svg.gz")),
+            Some("URS0000000372".to_string())
+        );
+        assert_eq!(
+            filename_urs(Path::new("URS0000000372.svg")),
+            Some("URS0000000372".to_string())
+        );
+        assert_eq!(
+            filename_urs(Path::new("URS0000000372")),
+            Some("URS0000000372".to_string())
+        );
+        assert_eq!(filename_urs(Path::new("URS00000002D191B..svg.gz")), None);
+        assert_eq!(filename_urs(Path::new("URS00000002C67ED..svg.gz")), None);
+        assert_eq!(filename_urs(Path::new("URS00000002C67ED..svg")), None);
+        assert_eq!(filename_urs(Path::new("URS00000002C67ED.")), None);
+        assert_eq!(filename_urs(Path::new("URS00000002C67ED")), None);
+    }
+
+    #[test]
+    fn creates_correct_final_path() {
+        let mut result = PathBuf::from("foo");
+        result.push("URS");
+        result.push("00");
+        result.push("00");
+        result.push("00");
+        result.push("03");
+        result.push("URS0000000372");
+        result.set_extension("svg.gz");
+        assert_eq!(
+            path_for(&PathBuf::from("foo"), &"URS0000000372".to_string()),
+            result
+        );
+    }
 }

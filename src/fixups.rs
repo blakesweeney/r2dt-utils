@@ -10,7 +10,7 @@ use walkdir::WalkDir;
 
 use anyhow::Result;
 
-mod urs_utils;
+pub mod urs_utils;
 
 #[derive(Serialize, Deserialize, Debug)]
 enum UrsStatus {

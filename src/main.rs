@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+#[macro_use]
+extern crate lazy_static;
+
 use anyhow::Result;
 
 mod coloring;
@@ -8,6 +11,7 @@ mod ena;
 mod fixups;
 mod lca;
 mod lineage;
+mod results;
 
 #[derive(Debug, StructOpt)]
 enum ColoringCommand {
@@ -53,6 +57,23 @@ enum Command {
     Fixups {
         #[structopt(subcommand)]
         cmd: FixupCommand,
+    },
+
+    #[structopt(name = "move", about = "Move SVGs into their final path")]
+    Move {
+        #[structopt(
+            name = "FILE",
+            about = "A filename containing a list of result directories to take SVGs from",
+            parse(from_os_str)
+        )]
+        filename: PathBuf,
+
+        #[structopt(
+            name = "DIR",
+            about = "The directory to put all svgs into",
+            parse(from_os_str)
+        )]
+        target_directory: PathBuf,
     },
 
     #[structopt(
@@ -119,5 +140,9 @@ pub fn main() -> Result<()> {
             taxid_filename,
             assignments_filename,
         } => lca::write_lca(taxid_filename, assignments_filename),
+        Command::Move {
+            filename,
+            target_directory,
+        } => results::move_file(filename, target_directory),
     };
 }
