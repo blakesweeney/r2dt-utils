@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, BufReader};
 use std::iter::Iterator;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use globset::{Glob, GlobSetBuilder};
 use walkdir::WalkDir;
@@ -10,9 +10,13 @@ use walkdir::WalkDir;
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
+use flate2::read::GzDecoder;
+
 use serde::{Deserialize, Serialize};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+
+use crate::fixups::urs_utils;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Counts {
@@ -82,6 +86,31 @@ fn count_reader<B: BufRead>(urs: String, reader: &mut Reader<B>) -> Result<Count
     return Ok(counts);
 }
 
+fn count_path(path: &PathBuf) -> Result<Counts> {
+    let urs = match urs_utils::filename_urs(&path) {
+        Some(u) => Ok(u),
+        None => Err(anyhow!("SVG does not have a URS")),
+    }?;
+
+    return match path.extension() {
+        Some(ext) => match ext.to_str() {
+            Some("svg") => {
+                let mut reader = Reader::from_file(path)?;
+                return count_reader(urs, &mut reader);
+            },
+            Some("gz") => {
+                let file = File::open(path)?;
+                let decoder = GzDecoder::new(file);
+                let buf = BufReader::new(decoder);
+                let mut reader = Reader::from_reader(buf);
+                return count_reader(urs, &mut reader);
+            },
+            e => Err(anyhow!("Cannot parse file with {:?} extension", e)),
+        },
+        None => Err(anyhow!("File {:?} does not have an extension", path)),
+    }
+}
+
 pub fn count_tree(path: PathBuf) -> Result<()> {
     let walker = WalkDir::new(path);
     let mut builder = GlobSetBuilder::new();
@@ -93,12 +122,8 @@ pub fn count_tree(path: PathBuf) -> Result<()> {
         .into_iter()
         .filter_map(Result::ok)
         .filter(move |e| glob.is_match(e.file_name()))
-        .map(|path| {
-            let filename = Path::new(path.file_name());
-            let urs = filename.file_stem().unwrap().to_str().unwrap().to_string();
-            let mut reader = Reader::from_file(path.path())?;
-            return count_reader(urs, &mut reader);
-        });
+        .map(|path| count_path(&path.into_path()));
+
     let mut wtr = csv::Writer::from_writer(io::stdout());
     for count in counts {
         let c = count?;
