@@ -12,6 +12,7 @@ mod fixups;
 mod lca;
 mod lineage;
 mod results;
+// mod fs;
 
 #[derive(Debug, StructOpt)]
 enum ColoringCommand {
@@ -96,6 +97,12 @@ enum Command {
         #[structopt(name = "ASSIGN", parse(from_os_str))]
         assignments_filename: PathBuf,
     },
+
+    #[structopt(name = "create-tree", about = "Command to generate the final tree")]
+    Fs {
+        max_urs: String,
+        base: PathBuf,
+    },
 }
 
 #[derive(Debug, StructOpt)]
@@ -144,5 +151,10 @@ pub fn main() -> Result<()> {
             filename,
             target_directory,
         } => results::move_file(filename, target_directory),
+        Command::Fs {
+            max_urs,
+            base,
+        } => Ok(()),
+        // } => fs::create_tree(max_urs, base),
     };
 }

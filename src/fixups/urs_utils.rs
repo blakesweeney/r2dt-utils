@@ -35,18 +35,24 @@ pub fn looks_like_urs(urs: &str) -> bool {
 }
 
 pub fn filename_urs(urs: &Path) -> Option<String> {
+    lazy_static! {
+        static ref MODEL_SUFFIX: Regex = Regex::new(r"-.+$").unwrap();
+    }
+
     return urs
         .file_name()
         .and_then(|f| f.to_str())
         .map(|s| s.replace(".gz", ""))
         .map(|s| s.replace("..svg", ""))
         .map(|s| s.replace(".svg", ""))
-        .and_then(|stem| {
-            return match looks_like_urs(&stem.as_ref()) {
-                true => Some(stem),
-                false => None,
-            };
-        });
+        .map(|s| s.replace(".colored", ""))
+        .map(|s| MODEL_SUFFIX.replace(&s, "").to_string())
+        .and_then(|s| {
+            match looks_like_urs(&s) {
+                true => Some(s.to_string()),
+                false => None
+            }
+        })
 }
 
 #[cfg(test)]
@@ -63,7 +69,7 @@ mod tests {
     #[test]
     fn extracts_urs() {
         assert_eq!(
-            filename_urs(Path::new("URS0000000372..svg.gz")),
+            filename_urs(Path::new("a/b/URS0000000372..svg.gz")),
             Some("URS0000000372".to_string())
         );
         assert_eq!(
@@ -78,11 +84,19 @@ mod tests {
             filename_urs(Path::new("URS0000000372")),
             Some("URS0000000372".to_string())
         );
+        assert_eq!(
+            filename_urs(Path::new("URS000042DD9D.colored.svg")),
+            Some("URS000042DD9D".to_string())
+        );
         assert_eq!(filename_urs(Path::new("URS00000002D191B..svg.gz")), None);
         assert_eq!(filename_urs(Path::new("URS00000002C67ED..svg.gz")), None);
         assert_eq!(filename_urs(Path::new("URS00000002C67ED..svg")), None);
         assert_eq!(filename_urs(Path::new("URS00000002C67ED.")), None);
         assert_eq!(filename_urs(Path::new("URS00000002C67ED")), None);
+        assert_eq!(
+            filename_urs(Path::new("URS0000C2D164-E-Ser.colored.svg")), 
+            Some("URS0000C2D164".to_string())
+        );
     }
 
     #[test]
