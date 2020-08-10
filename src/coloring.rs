@@ -20,6 +20,8 @@ use anyhow::{anyhow, Result};
 
 use crate::fixups::urs_utils;
 
+use crate::results::JsonDiagram;
+
 #[derive(Serialize, Deserialize, Debug)]
 struct Counts {
     urs: String,
@@ -29,12 +31,6 @@ struct Counts {
     moved: u64,
     rotated: u64,
     total: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct JsonEntry {
-    urs: String,
-    svg: String,
 }
 
 fn is_valid_letter(text: String) -> bool {
@@ -142,7 +138,7 @@ pub fn count_json(filename: PathBuf) -> Result<()> {
     let file = BufReader::new(file);
     let counts = file.lines().into_iter().map(|line| {
         let line = line?.replace("\\\\", "\\");
-        let entry: JsonEntry = serde_json::from_str(&line)?;
+        let entry: JsonDiagram = serde_json::from_str(&line)?;
         let mut reader = Reader::from_str(entry.svg.as_ref());
         return count_reader(entry.urs, &mut reader);
     });

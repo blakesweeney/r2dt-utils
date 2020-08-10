@@ -77,6 +77,22 @@ enum Command {
         target_directory: PathBuf,
     },
 
+    Split {
+        #[structopt(
+            name = "FILE",
+            about = "A filename containing the JSON encoded SVGs to split",
+            parse(from_os_str)
+        )]
+        filename: PathBuf,
+
+        #[structopt(
+            name = "DIR",
+            about = "The directory to put all svgs into",
+            parse(from_os_str)
+        )]
+        target_directory: PathBuf,
+    },
+
     #[structopt(
         name = "lineage",
         about = "Commad to fetch the taxid tree for some taxids"
@@ -148,6 +164,10 @@ pub fn main() -> Result<()> {
             filename,
             target_directory,
         } => results::move_file(filename, target_directory),
+        Command::Split {
+            filename,
+            target_directory,
+        } => results::split_file(filename, target_directory),
         Command::Fs { max_urs, base } => fs::create_tree(&max_urs, &base),
     };
 }
