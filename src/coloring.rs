@@ -7,6 +7,8 @@ use std::path::PathBuf;
 use globset::{Glob, GlobSetBuilder};
 use walkdir::WalkDir;
 
+use log::{info, trace};
+
 use quick_xml::events::Event;
 use quick_xml::Reader;
 
@@ -92,23 +94,26 @@ fn count_path(path: &PathBuf) -> Result<Counts> {
         None => Err(anyhow!("SVG does not have a URS")),
     }?;
 
+    info!("Parsing data for {:?}", path);
     return match path.extension() {
         Some(ext) => match ext.to_str() {
             Some("svg") => {
+                trace!("Parsing as svg");
                 let mut reader = Reader::from_file(path)?;
                 return count_reader(urs, &mut reader);
-            },
+            }
             Some("gz") => {
+                trace!("Parsing as compressed svg");
                 let file = File::open(path)?;
                 let decoder = GzDecoder::new(file);
                 let buf = BufReader::new(decoder);
                 let mut reader = Reader::from_reader(buf);
                 return count_reader(urs, &mut reader);
-            },
+            }
             e => Err(anyhow!("Cannot parse file with {:?} extension", e)),
         },
         None => Err(anyhow!("File {:?} does not have an extension", path)),
-    }
+    };
 }
 
 pub fn count_tree(path: PathBuf) -> Result<()> {

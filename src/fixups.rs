@@ -24,7 +24,7 @@ enum UrsStatus {
         urs: String,
         found_at: PathBuf,
     },
-    RenameSvg {
+    MoveSvg {
         urs: String,
         found_at: PathBuf,
         expected_path: PathBuf,
@@ -69,7 +69,7 @@ fn compare_paths(base: &PathBuf, urs: &String, path: &Path) -> UrsStatus {
 
     for possible in urs_utils::incorrect_paths(&base, &urs) {
         if possible == path {
-            return UrsStatus::RenameSvg {
+            return UrsStatus::MoveSvg {
                 urs: urs.to_string(),
                 found_at: possible,
                 expected_path,
