@@ -55,8 +55,6 @@ fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
         None => Err(anyhow!("Missing lineage for {}", &assignment.model_taxid)),
     }?;
 
-    println!("{:?}", sequence_lineage);
-    println!("{:?}", model_lineage);
     if assignment.sequence_taxid == assignment.model_taxid {
         return Ok(Lca {
             urs: assignment.urs,
