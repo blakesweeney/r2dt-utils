@@ -22,13 +22,12 @@ struct DiagramAssignment {
 #[derive(Debug, Deserialize, Serialize)]
 struct Lca {
     urs: String,
+    taxid: usize,
     model_name: String,
-
-    #[serde(flatten)]
-    taxon: lineage::TaxonInfo,
+    ancestor_rank: lineage::Rank,
 }
 
-type TreeInfo = HashMap<usize, lineage::Lineage>;
+type TreeInfo = HashMap<usize, lineage::Mapping>;
 
 fn load_taxid_trees(filename: PathBuf) -> Result<TreeInfo> {
     let file = File::open(filename)?;
@@ -38,13 +37,7 @@ fn load_taxid_trees(filename: PathBuf) -> Result<TreeInfo> {
     for line in file.lines() {
         let line = line?;
         let mapping: lineage::Mapping = serde_json::from_str(&line)?;
-        match mapping.lineage {
-            Some(l) => {
-                info.insert(mapping.taxid, l);
-                ();
-            }
-            None => (),
-        };
+        info.insert(mapping.taxid, mapping);
     }
     return Ok(info);
 }
@@ -62,43 +55,38 @@ fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
         None => Err(anyhow!("Missing lineage for {}", &assignment.model_taxid)),
     }?;
 
+    println!("{:?}", sequence_lineage);
+    println!("{:?}", model_lineage);
     if assignment.sequence_taxid == assignment.model_taxid {
-        let last: lineage::TaxonInfo = match sequence_lineage.last() {
-            Some(l) => lineage::TaxonInfo {
-                name: l.name.to_string(),
-                taxid: l.taxid,
-                rank: l.rank.as_ref().map(|s| s.to_string()),
-            },
-            None => panic!("Should never have empty lineage"),
-        };
         return Ok(Lca {
             urs: assignment.urs,
+            taxid: assignment.sequence_taxid,
             model_name: assignment.model_name,
-            taxon: last,
+            ancestor_rank: lineage::Rank::Species,
         });
     }
 
-    let pairs = sequence_lineage.iter().zip(model_lineage.iter());
-
-    for (seq, temp) in pairs {
-        if seq != temp {
-            let prev = match sequence_lineage.last() {
-                Some(l) => lineage::TaxonInfo {
-                    name: l.name.to_string(),
-                    taxid: l.taxid,
-                    rank: l.rank.as_ref().map(|s| s.to_string()),
-                },
-                None => panic!("Lineage cannot be empty"),
-            };
+    let mut ranks = lineage::Rank::ordered();
+    ranks.reverse();
+    for rank in ranks {
+        let sequence_taxon = sequence_lineage.taxon_at(&rank);
+        let model_taxon = model_lineage.taxon_at(&rank);
+        if sequence_taxon != model_taxon {
+            let previous = rank.previous_rank();
+            if previous.is_none() {
+                panic!("Impossible state");
+            }
+            let previous = previous.unwrap();
             return Ok(Lca {
                 urs: assignment.urs,
+                taxid: assignment.sequence_taxid,
                 model_name: assignment.model_name,
-                taxon: prev,
+                ancestor_rank: previous,
             });
         }
     }
 
-    panic!("Impossible state");
+    return Err(anyhow!("Failed to find lca"));
 }
 
 pub fn write_lca(taxid_filename: PathBuf, assignments_filename: PathBuf) -> Result<()> {
