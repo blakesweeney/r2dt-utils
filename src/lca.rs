@@ -64,22 +64,23 @@ fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
         });
     }
 
-    let mut ranks = lineage::Rank::ordered();
-    ranks.reverse();
-    for rank in ranks {
+    for rank in lineage::Rank::descending() {
         let sequence_taxon = sequence_lineage.taxon_at(&rank);
         let model_taxon = model_lineage.taxon_at(&rank);
         if sequence_taxon != model_taxon {
-            let previous = rank.previous_rank();
-            if previous.is_none() {
+            let parent = rank.parent_rank();
+            if parent.is_none() {
+                println!("{:?}", assignment);
+                println!("{:?}", sequence_taxon);
+                println!("{:?}", model_taxon);
                 panic!("Impossible state");
             }
-            let previous = previous.unwrap();
+            let parent = parent.unwrap();
             return Ok(Lca {
                 urs: assignment.urs,
                 taxid: assignment.sequence_taxid,
                 model_name: assignment.model_name,
-                ancestor_rank: previous,
+                ancestor_rank: parent,
             });
         }
     }
