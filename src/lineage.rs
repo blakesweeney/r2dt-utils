@@ -101,6 +101,9 @@ impl Mapping {
     }
 
     pub fn is_empty(&self) -> bool {
+        if self.taxid == 131567 {
+            return false;
+        }
         return self.species.is_none()
             && self.genus.is_none()
             && self.family.is_none()
