@@ -7,9 +7,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::iter::FromIterator;
+use std::option::Option;
 use std::path::PathBuf;
 use std::{thread, time};
-use std::option::Option;
 
 use log::{info, warn};
 
@@ -44,12 +44,22 @@ impl Rank {
             "kingdom" => Some(Self::Kingdom),
             "superkingdom" => Some(Self::Superkingdom),
             "root" => Some(Self::Root),
-            _ => None
-        }
+            _ => None,
+        };
     }
 
     pub fn ascending() -> Vec<Self> {
-        return vec![Rank::Species, Rank::Genus, Rank::Family, Rank::Order, Rank::Class, Rank::Phylum, Rank::Kingdom, Rank::Superkingdom, Rank::Root]
+        return vec![
+            Rank::Species,
+            Rank::Genus,
+            Rank::Family,
+            Rank::Order,
+            Rank::Class,
+            Rank::Phylum,
+            Rank::Kingdom,
+            Rank::Superkingdom,
+            Rank::Root,
+        ];
     }
 }
 
@@ -91,14 +101,14 @@ impl Mapping {
     }
 
     pub fn is_empty(&self) -> bool {
-        return self.species.is_none() &&
-            self.genus.is_none() &&
-            self.family.is_none() &&
-            self.order.is_none() &&
-            self.class.is_none() &&
-            self.phylum.is_none() &&
-            self.kingdom.is_none() &&
-            self.superkingdom.is_none()
+        return self.species.is_none()
+            && self.genus.is_none()
+            && self.family.is_none()
+            && self.order.is_none()
+            && self.class.is_none()
+            && self.phylum.is_none()
+            && self.kingdom.is_none()
+            && self.superkingdom.is_none();
     }
 }
 
@@ -125,21 +135,19 @@ fn lineage_mapping(taxon: &EnaTaxonInfo) -> Mapping {
             name: String::from("cellular organisms"),
             taxid: 131567,
             rank: Rank::Root,
-        })
+        }),
     };
 
     if taxon.rank == Some(String::from("species")) {
         mapping.species = Some(TaxonInfo {
             name: taxon.name.clone(),
             taxid: taxon.taxid,
-            rank: Rank::Species
+            rank: Rank::Species,
         })
     }
 
     for parent in taxon.parent_taxons() {
-        let rank: Option<Rank> = parent.rank
-            .as_ref()
-            .and_then(|r| Rank::from_string(&r));
+        let rank: Option<Rank> = parent.rank.as_ref().and_then(|r| Rank::from_string(&r));
 
         if rank.is_none() {
             continue;
