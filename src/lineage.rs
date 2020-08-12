@@ -49,7 +49,7 @@ impl Rank {
     }
 
     pub fn ascending() -> Vec<Self> {
-        return vec![Rank::Species, Rank::Genus, Rank::Family, Rank::Order, Rank::Class, Rank::Phylum, Rank::Kingdom, Rank::Superkingdom]
+        return vec![Rank::Species, Rank::Genus, Rank::Family, Rank::Order, Rank::Class, Rank::Phylum, Rank::Kingdom, Rank::Superkingdom, Rank::Root]
     }
 }
 
@@ -121,7 +121,11 @@ fn lineage_mapping(taxon: &EnaTaxonInfo) -> Mapping {
         phylum: None,
         kingdom: None,
         superkingdom: None,
-        root: None,
+        root: Some(TaxonInfo {
+            name: String::from("cellular organisms"),
+            taxid: 131567,
+            rank: Rank::Root,
+        })
     };
 
     if taxon.rank == Some(String::from("species")) {
