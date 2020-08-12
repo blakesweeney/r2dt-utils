@@ -64,28 +64,20 @@ fn lca(trees: &TreeInfo, assignment: DiagramAssignment) -> Result<Lca> {
         });
     }
 
-    for rank in lineage::Rank::descending() {
+    for rank in lineage::Rank::ascending() {
         let sequence_taxon = sequence_lineage.taxon_at(&rank);
         let model_taxon = model_lineage.taxon_at(&rank);
-        if sequence_taxon != model_taxon {
-            let parent = rank.parent_rank();
-            if parent.is_none() {
-                println!("{:?}", assignment);
-                println!("{:?}", sequence_taxon);
-                println!("{:?}", model_taxon);
-                panic!("Impossible state");
-            }
-            let parent = parent.unwrap();
+        if sequence_taxon == model_taxon {
             return Ok(Lca {
                 urs: assignment.urs,
                 taxid: assignment.sequence_taxid,
                 model_name: assignment.model_name,
-                ancestor_rank: parent,
+                ancestor_rank: rank,
             });
         }
     }
 
-    return Err(anyhow!("Failed to find lca"));
+    return Err(anyhow!("Failed to find lca for {:?}", assignment));
 }
 
 pub fn write_lca(taxid_filename: PathBuf, assignments_filename: PathBuf) -> Result<()> {

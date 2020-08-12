@@ -51,26 +51,6 @@ impl Rank {
     pub fn ascending() -> Vec<Self> {
         return vec![Rank::Species, Rank::Genus, Rank::Family, Rank::Order, Rank::Class, Rank::Phylum, Rank::Kingdom, Rank::Superkingdom]
     }
-
-    pub fn descending() -> Vec<Self> {
-        let mut ordered =  Self::ascending();
-        ordered.reverse();
-        return ordered;
-    }
-
-    pub fn parent_rank(self) -> Option<Self> {
-        match self {
-            Rank::Species => Some(Rank::Genus),
-            Rank::Genus => Some(Rank::Family),
-            Rank::Family => Some(Rank::Order),
-            Rank::Order => Some(Rank::Class),
-            Rank::Class => Some(Rank::Phylum),
-            Rank::Phylum => Some(Rank::Kingdom),
-            Rank::Kingdom => Some(Rank::Superkingdom),
-            Rank::Superkingdom => Some(Rank::Root),
-            Rank::Root => None,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
