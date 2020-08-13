@@ -1,6 +1,6 @@
 [package]
 name = "r2dt-utils"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Blake Sweeney <bsweeney@ebi.ac.uk>"]
 edition = "2018"
 
