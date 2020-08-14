@@ -77,6 +77,7 @@ enum Command {
         target_directory: PathBuf,
     },
 
+    /// Will move a JSON file of SVGs into their final locations
     Split {
         #[structopt(
             name = "FILE",

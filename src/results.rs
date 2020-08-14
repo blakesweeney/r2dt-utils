@@ -22,24 +22,17 @@ pub struct JsonDiagram {
     pub svg: String,
 }
 
-impl JsonDiagram {
-    pub fn dump(self, base: &PathBuf) -> Result<()> {
-        let path = urs_utils::path_for(&base, &self.urs);
-        let mut out = File::create(path)?;
-        out.write_all(&self.svg.as_bytes())?;
-        return Ok(());
-    }
-}
-
 struct DiagramSvg {
     urs: String,
     path: PathBuf,
 }
 
-impl DiagramSvg {
-    pub fn final_path(self, base: &PathBuf) -> PathBuf {
-        return urs_utils::path_for(&base, &self.urs);
-    }
+fn write(urs: &String, base: &PathBuf, svg: &String) -> Result<()> {
+    let path = urs_utils::path_for(base, urs);
+    let out_file = File::create(path)?;
+    let mut gz = GzEncoder::new(out_file, Compression::default());
+    gz.write_all(&svg.as_ref())?;
+    return Ok(());
 }
 
 fn svgs(directory: PathBuf) -> Result<Vec<DiagramSvg>> {
@@ -66,10 +59,7 @@ pub fn move_file(filename: PathBuf, target_directory: PathBuf) -> Result<()> {
         let line_path = PathBuf::from(line);
         for svg in svgs(line_path)? {
             let svg_text = read_to_string(&svg.path)?;
-            let final_path = svg.final_path(&target_directory);
-            let out_file = File::create(final_path)?;
-            let mut gz = GzEncoder::new(out_file, Compression::default());
-            gz.write_all(&svg_text.as_ref())?;
+            write(&svg.urs, &target_directory, &svg_text)?;
         }
     }
 
@@ -82,7 +72,7 @@ pub fn split_file(filename: PathBuf, target_directory: PathBuf) -> Result<()> {
     for line in file.lines() {
         let line = line?.replace("\\\\", "\\");
         let entry: JsonDiagram = serde_json::from_str(&line)?;
-        entry.dump(&target_directory)?;
+        write(&entry.urs, &target_directory, &entry.svg)?;
     }
     return Ok(());
 }
