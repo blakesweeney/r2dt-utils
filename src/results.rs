@@ -3,13 +3,14 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::collections::HashMap;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
 
 use serde::{Deserialize, Serialize};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 
 use globset::Glob;
 use walkdir::WalkDir;
@@ -27,11 +28,54 @@ struct DiagramSvg {
     path: PathBuf,
 }
 
-fn write(urs: &String, base: &PathBuf, svg: &String) -> Result<()> {
-    let path = urs_utils::path_for(base, urs);
+#[derive(Debug,Deserialize)]
+struct UrsRename {
+    old_urs: String,
+    new_urs: String,
+}
+
+enum Renamer {
+    NoRename,
+    UseMapping(HashMap<String, String>),
+}
+
+impl Renamer {
+    pub fn new(filename: Option<PathBuf>) -> Result<Self> {
+        return match filename {
+            None => Ok(Self::NoRename),
+            Some(filename) => {
+                let file = File::open(filename)?;
+                let reader = BufReader::new(file);
+                let mut reader = csv::Reader::from_reader(reader);
+
+                let mut mapping = HashMap::new();
+                for record in reader.deserialize() {
+                    let record: UrsRename = record?;
+                    mapping.insert(record.old_urs, record.new_urs);
+                }
+                return Ok(Self::UseMapping(mapping));
+            },
+        }
+    }
+
+    pub fn rename(&self, urs: &String) -> Option<String> {
+        return match self {
+            Self::NoRename => Some(urs.to_string()),
+            Self::UseMapping(mapping) => mapping.get(urs).map(|s| s.to_string()),
+        }
+    }
+}
+
+
+fn write(diagram: &JsonDiagram, renamer: &Renamer, base: &PathBuf) -> Result<()> {
+    let urs = match renamer.rename(&diagram.urs) {
+        Some(u) => Ok(u),
+        None => Err(anyhow!("Could not rename urs {}", &diagram.urs)),
+    }?;
+    let path = urs_utils::path_for(base, &urs);
     let out_file = File::create(path)?;
     let mut gz = GzEncoder::new(out_file, Compression::default());
-    gz.write_all(&svg.as_ref())?;
+    gz.write_all(&diagram.svg.as_ref())?;
     return Ok(());
 }
 
@@ -50,29 +94,32 @@ fn svgs(directory: PathBuf) -> Result<Vec<DiagramSvg>> {
     return Ok(svgs);
 }
 
-pub fn move_file(filename: PathBuf, target_directory: PathBuf) -> Result<()> {
+pub fn move_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Option<PathBuf>) -> Result<()> {
     let file = File::open(filename)?;
     let reader = BufReader::new(file);
+    let renamer = Renamer::new(mapping_file)?;
 
     for line in reader.lines() {
         let line = line?;
         let line_path = PathBuf::from(line);
-        for svg in svgs(line_path)? {
-            let svg_text = read_to_string(&svg.path)?;
-            write(&svg.urs, &target_directory, &svg_text)?;
+        for diagram in svgs(line_path)? {
+            let svg_text = read_to_string(&diagram.path)?;
+            let json = JsonDiagram { urs: diagram.urs, svg: svg_text };
+            write(&json, &renamer, &target_directory)?;
         }
     }
 
     return Ok(());
 }
 
-pub fn split_file(filename: PathBuf, target_directory: PathBuf) -> Result<()> {
+pub fn split_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Option<PathBuf>) -> Result<()> {
     let file = File::open(filename)?;
     let file = BufReader::new(file);
+    let renamer = Renamer::new(mapping_file)?;
     for line in file.lines() {
         let line = line?.replace("\\\\", "\\");
         let entry: JsonDiagram = serde_json::from_str(&line)?;
-        write(&entry.urs, &target_directory, &entry.svg)?;
+        write(&entry, &renamer, &target_directory)?;
     }
     return Ok(());
 }

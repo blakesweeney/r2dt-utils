@@ -62,6 +62,9 @@ enum Command {
 
     #[structopt(name = "move", about = "Move SVGs into their final path")]
     Move {
+        #[structopt(short = "m", long = "mapping-file", about = "A file mapping from old to new URS", parse(from_os_str))]
+        rename_file: Option<PathBuf>,
+
         #[structopt(
             name = "FILE",
             about = "A filename containing a list of result directories to take SVGs from",
@@ -79,6 +82,9 @@ enum Command {
 
     /// Will move a JSON file of SVGs into their final locations
     Split {
+        #[structopt(short = "m", long = "mapping-file", about = "A file mapping from old to new URS", parse(from_os_str))]
+        rename_file: Option<PathBuf>,
+
         #[structopt(
             name = "FILE",
             about = "A filename containing the JSON encoded SVGs to split",
@@ -164,11 +170,13 @@ pub fn main() -> Result<()> {
         Command::Move {
             filename,
             target_directory,
-        } => results::move_file(filename, target_directory),
+            rename_file,
+        } => results::move_file(filename, target_directory, rename_file),
         Command::Split {
             filename,
             target_directory,
-        } => results::split_file(filename, target_directory),
+            rename_file,
+        } => results::split_file(filename, target_directory, rename_file),
         Command::Fs { max_urs, base } => fs::create_tree(&max_urs, &base),
     };
 }
