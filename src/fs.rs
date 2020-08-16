@@ -1,5 +1,8 @@
 use std::fs::create_dir_all;
 use std::path::PathBuf;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
 
 use anyhow::Result;
 
@@ -18,6 +21,18 @@ fn generate_paths(max_urs: &String, target: &PathBuf) -> Result<Vec<PathBuf>> {
 pub fn create_tree(max_urs: &String, base: &PathBuf) -> Result<()> {
     for path in generate_paths(&max_urs, &base)? {
         create_dir_all(path)?;
+    }
+    return Ok(());
+}
+
+pub fn paths(urs_filename: PathBuf, base: PathBuf) -> Result<()> {
+    let file = File::open(urs_filename)?;
+    let file = BufReader::new(file);
+    for line in file.lines() {
+        let urs = line?.trim().to_string();
+        let path = urs_utils::path_for(&base, &urs);
+        let str_path = path.into_os_string().into_string().unwrap();
+        println!("{}", str_path);
     }
     return Ok(());
 }

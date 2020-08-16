@@ -123,6 +123,19 @@ enum Command {
 
     #[structopt(name = "create-tree", about = "Command to generate the final tree")]
     Fs { max_urs: String, base: PathBuf },
+
+    #[structopt(name = "path-to", about = "Command to generate path for URS ids")]
+    PathTo {
+        #[structopt(name = "FILE", parse(from_os_str))]
+        urs_filename: PathBuf,
+
+        #[structopt(
+            name = "DIR",
+            about = "The directory to put all svgs into",
+            parse(from_os_str)
+        )]
+        target_directory: PathBuf,
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -178,5 +191,6 @@ pub fn main() -> Result<()> {
             rename_file,
         } => results::split_file(filename, target_directory, rename_file),
         Command::Fs { max_urs, base } => fs::create_tree(&max_urs, &base),
+        Command::PathTo { urs_filename, target_directory } => fs::paths(urs_filename, target_directory),
     };
 }
