@@ -10,7 +10,7 @@ use flate2::Compression;
 
 use serde::{Deserialize, Serialize};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 
 use globset::Glob;
 use walkdir::WalkDir;
@@ -66,12 +66,13 @@ impl Renamer {
     }
 }
 
-
 fn write(diagram: &JsonDiagram, renamer: &Renamer, base: &PathBuf) -> Result<()> {
-    let urs = match renamer.rename(&diagram.urs) {
-        Some(u) => Ok(u),
-        None => Err(anyhow!("Could not rename urs {}", &diagram.urs)),
-    }?;
+    let urs = renamer.rename(&diagram.urs);
+    if urs.is_none() {
+        log::error!("Could not find renamed URS for {:?}", urs);
+        return Ok(());
+    };
+    let urs = urs.unwrap();
     let path = urs_utils::path_for(base, &urs);
     let out_file = File::create(path)?;
     let mut gz = GzEncoder::new(out_file, Compression::default());
