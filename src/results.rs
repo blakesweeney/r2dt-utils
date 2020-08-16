@@ -12,7 +12,6 @@ use serde::{Deserialize, Serialize};
 
 use anyhow::Result;
 
-use globset::Glob;
 use walkdir::WalkDir;
 
 use crate::fixups::urs_utils;
@@ -23,6 +22,7 @@ pub struct JsonDiagram {
     pub svg: String,
 }
 
+#[derive(Debug)]
 struct DiagramSvg {
     urs: String,
     path: PathBuf,
@@ -97,14 +97,24 @@ fn write(diagram: &JsonDiagram, renamer: &Renamer, base: &PathBuf) -> Result<()>
 }
 
 fn svgs(directory: PathBuf) -> Result<Vec<DiagramSvg>> {
-    let glob = Glob::new("URS*.svg")?.compile_matcher();
-    let svgs = WalkDir::new(directory)
-        .into_iter()
-        .filter_map(Result::ok)
-        .map(|f| PathBuf::from(f.path()))
-        .filter(|f| glob.is_match(f))
-        .filter_map(|path| urs_utils::filename_urs(&path).map(|urs| DiagramSvg { urs, path }))
-        .collect::<Vec<DiagramSvg>>();
+    let mut svgs = Vec::new();
+    for filename in WalkDir::new(directory) {
+        log::debug!("Found file: {:?}", &filename);
+        let filename = filename?;
+        let path = PathBuf::from(filename.path());
+        let base = path.file_name();
+        if base.is_none() {
+            log::debug!("Skipping as no filename");
+        }
+        let base = base.unwrap();
+        let urs = urs_utils::filename_urs(&PathBuf::from(base));
+        if urs.is_none() {
+            log::debug!("Cannot extract urs from {:?}", &path);
+            continue;
+        }
+        let urs = urs.unwrap();
+        svgs.push(DiagramSvg { urs, path });
+    }
     return Ok(svgs);
 }
 
