@@ -1,7 +1,7 @@
 use std::fs::read_to_string;
 use std::fs::File;
 use std::io::prelude::*;
-use std::io::BufReader;
+use std::io::{stdout, BufReader};
 use std::path::PathBuf;
 use std::collections::HashMap;
 
@@ -32,6 +32,20 @@ struct DiagramSvg {
 struct UrsRename {
     old_urs: String,
     new_urs: String,
+}
+
+#[derive(Debug,Deserialize,Serialize)]
+struct Metadata {
+     urs: String,
+     secondary_structure: String,
+     overlap_count: u64,
+     basepair_count: u64,
+     model_start: u64,
+     model_stop: u64,
+     sequence_start: u64,
+     sequence_stop: u64,
+     sequence_coverage: f64,
+     model_id: u64,
 }
 
 enum Renamer {
@@ -81,11 +95,8 @@ fn write(diagram: &JsonDiagram, renamer: &Renamer, base: &PathBuf) -> Result<()>
 }
 
 fn svgs(directory: PathBuf) -> Result<Vec<DiagramSvg>> {
-    let mut result_path = PathBuf::from(directory);
-    result_path.push("output");
-    result_path.push("results");
     let glob = Glob::new("URS*.svg")?.compile_matcher();
-    let svgs = WalkDir::new(result_path)
+    let svgs = WalkDir::new(directory)
         .into_iter()
         .filter_map(Result::ok)
         .map(|f| PathBuf::from(f.path()))
@@ -122,5 +133,25 @@ pub fn split_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Op
         let entry: JsonDiagram = serde_json::from_str(&line)?;
         write(&entry, &renamer, &target_directory)?;
     }
+    return Ok(());
+}
+
+pub fn rename_metadata(mapping_file: PathBuf, filename: PathBuf) -> Result<()> {
+    let renamer = Renamer::new(Some(mapping_file))?;
+    let file = File::open(filename)?;
+    let reader = BufReader::new(file);
+    let mut reader = csv::Reader::from_reader(reader);
+    let mut writer = csv::Writer::from_writer(stdout());
+    for record in reader.deserialize() {
+        let record: Metadata = record?;
+        let urs = renamer.rename(&record.urs);
+        if urs.is_none() {
+            log::error!("Could not find renamed URS for {:?}", urs);
+            continue;
+        };
+        let record = Metadata { urs: urs.unwrap(), ..record };
+        writer.serialize(record)?;
+    }
+    writer.flush()?;
     return Ok(());
 }

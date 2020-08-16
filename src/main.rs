@@ -135,7 +135,16 @@ enum Command {
             parse(from_os_str)
         )]
         target_directory: PathBuf,
-    }
+    },
+
+    #[structopt(name = "rename-metadata", about = "Parse a CSV and rename the URS ids")]
+    RenameMetadata {
+        #[structopt(name = "MAPPING", parse(from_os_str))]
+        mapping_file: PathBuf,
+
+        #[structopt(name = "FILE", parse(from_os_str))]
+        filename: PathBuf,
+    },
 }
 
 #[derive(Debug, StructOpt)]
@@ -192,5 +201,6 @@ pub fn main() -> Result<()> {
         } => results::split_file(filename, target_directory, rename_file),
         Command::Fs { max_urs, base } => fs::create_tree(&max_urs, &base),
         Command::PathTo { urs_filename, target_directory } => fs::paths(urs_filename, target_directory),
+        Command::RenameMetadata { mapping_file, filename } => results::rename_metadata(mapping_file, filename),
     };
 }
