@@ -87,7 +87,9 @@ fn write(diagram: &JsonDiagram, renamer: &Renamer, base: &PathBuf) -> Result<()>
         return Ok(());
     };
     let urs = urs.unwrap();
+    log::info!("Renaming {} to {}", &diagram.urs, &urs);
     let path = urs_utils::path_for(base, &urs);
+    log::info!("Writing to {:?}", &path);
     let out_file = File::create(path)?;
     let mut gz = GzEncoder::new(out_file, Compression::default());
     gz.write_all(&diagram.svg.as_ref())?;
@@ -115,6 +117,7 @@ pub fn move_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Opt
         let line = line?;
         let line_path = PathBuf::from(line);
         for diagram in svgs(line_path)? {
+            log::info!("Moving {} found at {:?}", &diagram.urs, &diagram.path);
             let svg_text = read_to_string(&diagram.path)?;
             let json = JsonDiagram { urs: diagram.urs, svg: svg_text };
             write(&json, &renamer, &target_directory)?;
