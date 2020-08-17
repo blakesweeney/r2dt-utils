@@ -46,7 +46,7 @@ struct Metadata {
      sequence_start: Option<u64>,
      sequence_stop: Option<u64>,
      sequence_coverage: Option<f64>,
-     model_id: u64,
+     model_name: String,
 }
 
 #[derive(Debug,Deserialize,Serialize)]
