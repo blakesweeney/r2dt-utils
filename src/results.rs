@@ -4,6 +4,7 @@ use std::io::prelude::*;
 use std::io::{stdout, BufReader};
 use std::path::PathBuf;
 use std::collections::HashMap;
+use std::time::SystemTime;
 
 use flate2::write::GzEncoder;
 use flate2::Compression;
@@ -48,6 +49,12 @@ struct Metadata {
      model_id: u64,
 }
 
+#[derive(Debug,Deserialize,Serialize)]
+struct Cdmi {
+    value: String
+}
+
+
 enum Renamer {
     NoRename,
     UseMapping(HashMap<String, String>),
@@ -77,6 +84,13 @@ impl Renamer {
             Self::NoRename => Some(urs.to_string()),
             Self::UseMapping(mapping) => mapping.get(urs).map(|s| s.to_string()),
         }
+    }
+}
+
+impl Cdmi {
+    pub fn from_path(path: &PathBuf) -> Result<Self> {
+        let value = read_to_string(&path)?;
+        return Ok(Self { value });
     }
 }
 
@@ -166,5 +180,48 @@ pub fn rename_metadata(mapping_file: PathBuf, filename: PathBuf) -> Result<()> {
         writer.serialize(record)?;
     }
     writer.flush()?;
+    return Ok(());
+}
+
+pub fn transfer_svgs(access_token: &String, host: &String, remote_path: &String, filename: &PathBuf) -> Result<()> {
+    let file = File::open(filename)?;
+    let file = BufReader::new(file);
+    let client = reqwest::blocking::Client::new();
+    let start = SystemTime::now();
+    let mut total: usize = 0;
+    for line in file.lines() {
+        total += 1;
+        let line = line?;
+        let path = PathBuf::from(&line);
+        if !path.is_file() {
+            log::error!("Could not load SVG file {:?}", &path);
+            continue;
+        }
+        let urs = path.file_name().and_then(|s| s.to_str());
+        if urs.is_none() {
+            log::error!("No URS found in filename: {:?}", &path);
+            continue;
+        }
+        let urs = urs.unwrap();
+        let url = format!("https://{}/cdmi/RNA-Sequences/{}/{}",
+            &host,
+            remote_path,
+            &urs,
+        );
+        let object = Cdmi::from_path(&path)?;
+        log::debug!("Sending {:?} to {}", &path, &url);
+        client.put(&url)
+            .header("X-Auth-Token", access_token)
+            .header("X-CDMI-Specification-Version", "1.1.1")
+            .header("Content-Type", "application/cdmi-object")
+            .body(serde_json::to_string(&object)?)
+            .send()?;
+        if total % 10 == 0 {
+            log::info!("Sent {} requests in {} milliseconds", total, start.elapsed()?.as_millis());
+        }
+    }
+
+    log::info!("Sent {} requests in {} milliseconds", total, start.elapsed()?.as_millis());
+
     return Ok(());
 }

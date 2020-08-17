@@ -145,6 +145,20 @@ enum Command {
         #[structopt(name = "FILE", parse(from_os_str))]
         filename: PathBuf,
     },
+
+    TransferData {
+        #[structopt(short, long, env = "ONECLIENT_ACCESS_TOKEN")]
+        access_token: String,
+
+        #[structopt(short, long, env = "ONECLIENT_PROVIDER_HOST")]
+        host: String,
+
+        #[structopt(short, long, env = "ONEDATA_PATH", default_value = "test_data")]
+        remote_path: String,
+
+        #[structopt(name = "FILE", parse(from_os_str))]
+        filename: PathBuf,
+    }
 }
 
 #[derive(Debug, StructOpt)]
@@ -202,5 +216,11 @@ pub fn main() -> Result<()> {
         Command::Fs { max_urs, base } => fs::create_tree(&max_urs, &base),
         Command::PathTo { urs_filename, target_directory } => fs::paths(urs_filename, target_directory),
         Command::RenameMetadata { mapping_file, filename } => results::rename_metadata(mapping_file, filename),
+        Command::TransferData {
+            access_token,
+            host,
+            remote_path,
+            filename,
+        } => results::transfer_svgs(&access_token, &host, &remote_path, &filename),
     };
 }
