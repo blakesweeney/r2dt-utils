@@ -51,9 +51,8 @@ struct Metadata {
 
 #[derive(Debug,Deserialize,Serialize)]
 struct Cdmi {
-    value: String
+    value: String,
 }
-
 
 enum Renamer {
     NoRename,
@@ -89,7 +88,10 @@ impl Renamer {
 
 impl Cdmi {
     pub fn from_path(path: &PathBuf) -> Result<Self> {
-        let value = read_to_string(&path)?;
+        let mut buf = Vec::new();
+        let mut file = File::open(path)?;
+        file.read_to_end(&mut buf)?;
+        let value = base64::encode(buf);
         return Ok(Self { value });
     }
 }
