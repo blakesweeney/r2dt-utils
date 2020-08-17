@@ -41,11 +41,11 @@ struct Metadata {
      secondary_structure: String,
      overlap_count: u64,
      basepair_count: u64,
-     model_start: u64,
-     model_stop: u64,
-     sequence_start: u64,
-     sequence_stop: u64,
-     sequence_coverage: f64,
+     model_start: Option<u64>,
+     model_stop: Option<u64>,
+     sequence_start: Option<u64>,
+     sequence_stop: Option<u64>,
+     sequence_coverage: Option<f64>,
      model_id: u64,
 }
 
