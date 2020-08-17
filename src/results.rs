@@ -171,17 +171,20 @@ pub fn rename_metadata(mapping_file: PathBuf, filename: PathBuf) -> Result<()> {
     let reader = BufReader::new(file);
     let mut reader = csv::Reader::from_reader(reader);
     let mut writer = csv::Writer::from_writer(stdout());
+    let mut unmapped = 0;
     for record in reader.deserialize() {
         let record: Metadata = record?;
         let urs = renamer.rename(&record.urs);
         if urs.is_none() {
-            log::error!("Could not find renamed URS for {:?}", urs);
+            log::error!("Could not find renamed URS for {:?}", &record.urs);
+            unmapped += 1;
             continue;
         };
         let record = Metadata { urs: urs.unwrap(), ..record };
         writer.serialize(record)?;
     }
     writer.flush()?;
+    log::info!("Did not find mapping for {} urs ids", unmapped);
     return Ok(());
 }
 
