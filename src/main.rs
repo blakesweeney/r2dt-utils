@@ -180,10 +180,9 @@ pub fn main() -> Result<()> {
         2 => simplelog::LevelFilter::Debug,
         _ => simplelog::LevelFilter::Trace,
     };
-    simplelog::TermLogger::init(
+    simplelog::SimpleLogger::init(
         level,
         simplelog::Config::default(),
-        simplelog::TerminalMode::Stderr,
     )
     .unwrap_or_else(|_| eprintln!("Failed to create logger, ignore"));
 
