@@ -1,9 +1,9 @@
+use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{stdout, BufReader};
 use std::path::PathBuf;
-use std::collections::HashMap;
 use std::time::SystemTime;
 
 use flate2::write::GzEncoder;
@@ -29,27 +29,27 @@ struct DiagramSvg {
     path: PathBuf,
 }
 
-#[derive(Debug,Deserialize)]
+#[derive(Debug, Deserialize)]
 struct UrsRename {
     old_urs: String,
     new_urs: String,
 }
 
-#[derive(Debug,Deserialize,Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Metadata {
-     urs: String,
-     secondary_structure: String,
-     overlap_count: u64,
-     basepair_count: u64,
-     model_start: Option<u64>,
-     model_stop: Option<u64>,
-     sequence_start: Option<u64>,
-     sequence_stop: Option<u64>,
-     sequence_coverage: Option<f64>,
-     model_name: String,
+    urs: String,
+    secondary_structure: String,
+    overlap_count: u64,
+    basepair_count: u64,
+    model_start: Option<u64>,
+    model_stop: Option<u64>,
+    sequence_start: Option<u64>,
+    sequence_stop: Option<u64>,
+    sequence_coverage: Option<f64>,
+    model_name: String,
 }
 
-#[derive(Debug,Deserialize,Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Cdmi {
     value: String,
 }
@@ -57,6 +57,13 @@ struct Cdmi {
 enum Renamer {
     NoRename,
     UseMapping(HashMap<String, String>),
+}
+
+pub struct TransferOptions {
+    pub host: String,
+    pub access_token: String,
+    pub remote_path: String,
+    pub use_http: bool,
 }
 
 impl Renamer {
@@ -74,15 +81,15 @@ impl Renamer {
                     mapping.insert(record.old_urs, record.new_urs);
                 }
                 return Ok(Self::UseMapping(mapping));
-            },
-        }
+            }
+        };
     }
 
     pub fn rename(&self, urs: &String) -> Option<String> {
         return match self {
             Self::NoRename => Some(urs.to_string()),
             Self::UseMapping(mapping) => mapping.get(urs).map(|s| s.to_string()),
-        }
+        };
     }
 }
 
@@ -93,6 +100,15 @@ impl Cdmi {
         file.read_to_end(&mut buf)?;
         let value = base64::encode(buf);
         return Ok(Self { value });
+    }
+}
+
+impl TransferOptions {
+    pub fn scheme(&self) -> &str {
+        return match self.use_http {
+            true => "http",
+            false => "https",
+        };
     }
 }
 
@@ -134,7 +150,11 @@ fn svgs(directory: PathBuf) -> Result<Vec<DiagramSvg>> {
     return Ok(svgs);
 }
 
-pub fn move_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Option<PathBuf>) -> Result<()> {
+pub fn move_file(
+    filename: PathBuf,
+    target_directory: PathBuf,
+    mapping_file: Option<PathBuf>,
+) -> Result<()> {
     let file = File::open(filename)?;
     let reader = BufReader::new(file);
     let renamer = Renamer::new(mapping_file)?;
@@ -145,7 +165,10 @@ pub fn move_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Opt
         for diagram in svgs(line_path)? {
             log::info!("Moving {} found at {:?}", &diagram.urs, &diagram.path);
             let svg_text = read_to_string(&diagram.path)?;
-            let json = JsonDiagram { urs: diagram.urs, svg: svg_text };
+            let json = JsonDiagram {
+                urs: diagram.urs,
+                svg: svg_text,
+            };
             write(&json, &renamer, &target_directory)?;
         }
     }
@@ -153,7 +176,11 @@ pub fn move_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Opt
     return Ok(());
 }
 
-pub fn split_file(filename: PathBuf, target_directory: PathBuf, mapping_file: Option<PathBuf>) -> Result<()> {
+pub fn split_file(
+    filename: PathBuf,
+    target_directory: PathBuf,
+    mapping_file: Option<PathBuf>,
+) -> Result<()> {
     let file = File::open(filename)?;
     let file = BufReader::new(file);
     let renamer = Renamer::new(mapping_file)?;
@@ -180,7 +207,10 @@ pub fn rename_metadata(mapping_file: PathBuf, filename: PathBuf) -> Result<()> {
             unmapped += 1;
             continue;
         };
-        let record = Metadata { urs: urs.unwrap(), ..record };
+        let record = Metadata {
+            urs: urs.unwrap(),
+            ..record
+        };
         writer.serialize(record)?;
     }
     writer.flush()?;
@@ -188,7 +218,7 @@ pub fn rename_metadata(mapping_file: PathBuf, filename: PathBuf) -> Result<()> {
     return Ok(());
 }
 
-pub fn transfer_svgs(access_token: &String, host: &String, remote_path: &String, filename: &PathBuf) -> Result<()> {
+pub fn transfer_svgs(filename: &PathBuf, options: TransferOptions) -> Result<()> {
     let file = File::open(filename)?;
     let file = BufReader::new(file);
     let client = reqwest::blocking::Client::new();
@@ -208,25 +238,33 @@ pub fn transfer_svgs(access_token: &String, host: &String, remote_path: &String,
             continue;
         }
         let urs = urs.unwrap();
-        let url = format!("https://{}/cdmi/RNA-Sequences/{}/{}",
-            &host,
-            remote_path,
-            &urs,
+        let url = format!(
+            "{}://{}/cdmi/RNA-Sequences/{}/{}",
+            options.scheme(), &options.host, options.remote_path, &urs,
         );
         let object = Cdmi::from_path(&path)?;
         log::debug!("Sending {:?} to {}", &path, &url);
-        client.put(&url)
-            .header("X-Auth-Token", access_token)
+        client
+            .put(&url)
+            .header("X-Auth-Token", &options.access_token)
             .header("X-CDMI-Specification-Version", "1.1.1")
             .header("Content-Type", "application/cdmi-object")
             .body(serde_json::to_string(&object)?)
             .send()?;
         if total % 10 == 0 {
-            log::info!("Sent {} requests in {} milliseconds", total, start.elapsed()?.as_millis());
+            log::info!(
+                "Sent {} requests in {} milliseconds",
+                total,
+                start.elapsed()?.as_millis()
+            );
         }
     }
 
-    log::info!("Sent {} requests in {} milliseconds", total, start.elapsed()?.as_millis());
+    log::info!(
+        "Sent {} requests in {} milliseconds",
+        total,
+        start.elapsed()?.as_millis()
+    );
 
     return Ok(());
 }

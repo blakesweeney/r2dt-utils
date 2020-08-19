@@ -62,7 +62,12 @@ enum Command {
 
     #[structopt(name = "move", about = "Move SVGs into their final path")]
     Move {
-        #[structopt(short = "m", long = "mapping-file", about = "A file mapping from old to new URS", parse(from_os_str))]
+        #[structopt(
+            short = "m",
+            long = "mapping-file",
+            about = "A file mapping from old to new URS",
+            parse(from_os_str)
+        )]
         rename_file: Option<PathBuf>,
 
         #[structopt(
@@ -82,7 +87,12 @@ enum Command {
 
     /// Will move a JSON file of SVGs into their final locations
     Split {
-        #[structopt(short = "m", long = "mapping-file", about = "A file mapping from old to new URS", parse(from_os_str))]
+        #[structopt(
+            short = "m",
+            long = "mapping-file",
+            about = "A file mapping from old to new URS",
+            parse(from_os_str)
+        )]
         rename_file: Option<PathBuf>,
 
         #[structopt(
@@ -156,9 +166,12 @@ enum Command {
         #[structopt(short, long, env = "ONEDATA_PATH", default_value = "test_data")]
         remote_path: String,
 
+        #[structopt(short, long)]
+        use_http: bool,
+
         #[structopt(name = "FILE", parse(from_os_str))]
         filename: PathBuf,
-    }
+    },
 }
 
 #[derive(Debug, StructOpt)]
@@ -180,11 +193,8 @@ pub fn main() -> Result<()> {
         2 => simplelog::LevelFilter::Debug,
         _ => simplelog::LevelFilter::Trace,
     };
-    simplelog::SimpleLogger::init(
-        level,
-        simplelog::Config::default(),
-    )
-    .unwrap_or_else(|_| eprintln!("Failed to create logger, ignore"));
+    simplelog::SimpleLogger::init(level, simplelog::Config::default())
+        .unwrap_or_else(|_| eprintln!("Failed to create logger, ignore"));
 
     return match opt.cmd {
         Command::Coloring { cmd } => match cmd {
@@ -213,13 +223,28 @@ pub fn main() -> Result<()> {
             rename_file,
         } => results::split_file(filename, target_directory, rename_file),
         Command::Fs { max_urs, base } => fs::create_tree(&max_urs, &base),
-        Command::PathTo { urs_filename, target_directory } => fs::paths(urs_filename, target_directory),
-        Command::RenameMetadata { mapping_file, filename } => results::rename_metadata(mapping_file, filename),
+        Command::PathTo {
+            urs_filename,
+            target_directory,
+        } => fs::paths(urs_filename, target_directory),
+        Command::RenameMetadata {
+            mapping_file,
+            filename,
+        } => results::rename_metadata(mapping_file, filename),
         Command::TransferData {
             access_token,
             host,
             remote_path,
+            use_http,
             filename,
-        } => results::transfer_svgs(&access_token, &host, &remote_path, &filename),
+        } => {
+            let options = results::TransferOptions {
+                host,
+                access_token,
+                remote_path,
+                use_http,
+            };
+            return results::transfer_svgs(&filename, options);
+        }
     };
 }

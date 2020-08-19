@@ -1,8 +1,8 @@
 use std::fs::create_dir_all;
-use std::path::PathBuf;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
+use std::path::PathBuf;
 
 use anyhow::Result;
 
